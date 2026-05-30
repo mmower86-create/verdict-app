@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
+import { API } from './App'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export default function DecodeWorkspace() {
   async function fetchUsage() {
     try {
       const token = await getToken()
-      const res = await fetch('/api/usage', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${API}/api/usage`, { headers: { Authorization: `Bearer ${token}` } })
       if (res.ok) setUsage(await res.json())
     } catch { /* non-critical */ }
   }
@@ -179,7 +180,7 @@ export default function DecodeWorkspace() {
   async function fetchHistory() {
     try {
       const token = await getToken()
-      const res = await fetch('/api/history', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${API}/api/history`, { headers: { Authorization: `Bearer ${token}` } })
       if (res.ok) setHistoryItems(await res.json())
     } catch { /* non-critical */ }
   }
@@ -197,7 +198,7 @@ export default function DecodeWorkspace() {
 
   async function startCheckout() {
     const token = await getToken()
-    const res = await fetch('/api/checkout', {
+    const res = await fetch(`${API}/api/checkout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -213,7 +214,7 @@ export default function DecodeWorkspace() {
 
     try {
       const token = await getToken()
-      const res = await fetch('/api/decode', {
+      const res = await fetch(`${API}/api/decode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ docType: 'lease', text }),

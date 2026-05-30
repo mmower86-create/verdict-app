@@ -1,6 +1,8 @@
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import DecodeWorkspace from './DecodeWorkspace'
 
+export const API = import.meta.env.VITE_API_URL || ''
+
 function LogoMark() {
   return (
     <div style={s.logoMark}>V</div>

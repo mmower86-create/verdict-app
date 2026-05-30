@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 const promptFiles = {
-  lease: fs.readFileSync(path.join(__dirname, '../prompts/lease-decoder-v1.txt'), 'utf8'),
+  lease: fs.readFileSync(path.join(__dirname, 'prompts/lease-decoder-v1.txt'), 'utf8'),
 };
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

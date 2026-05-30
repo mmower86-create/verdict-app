@@ -35,7 +35,9 @@ cp client/.env.example client/.env
 
 **server/.env**
 ```
+CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+ANTHROPIC_API_KEY=sk-ant-...
 PORT=3001
 ```
 
@@ -63,12 +65,13 @@ This starts both servers in one terminal:
 
 | Variable                       | Used by  | Description                          |
 |-------------------------------|----------|--------------------------------------|
+| `CLERK_PUBLISHABLE_KEY`        | server   | Clerk publishable key (needed by @clerk/express to validate tokens) |
 | `CLERK_SECRET_KEY`             | server   | Clerk secret key (never in browser)  |
+| `ANTHROPIC_API_KEY`            | server   | Anthropic API key (never in browser) |
 | `PORT`                         | server   | Express port (default: 3001)         |
 | `VITE_CLERK_PUBLISHABLE_KEY`   | client   | Clerk publishable key                |
 
 Variables added in later phases:
-- `ANTHROPIC_API_KEY` (server only) -- Phase B
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY` (server) -- Phase C
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (server) -- Phase D
 

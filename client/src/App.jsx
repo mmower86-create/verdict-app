@@ -1,56 +1,37 @@
-import { useEffect, useState } from 'react'
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import DecodeWorkspace from './DecodeWorkspace'
 
-function HealthStatus() {
-  const [status, setStatus] = useState('checking')
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setStatus(data.ok ? 'connected' : 'error'))
-      .catch(() => setStatus('error'))
-  }, [])
-
-  const color = status === 'connected' ? 'green' : status === 'error' ? 'red' : 'gray'
-  const label =
-    status === 'connected'
-      ? 'Backend connected'
-      : status === 'error'
-      ? 'Backend not reachable'
-      : 'Checking backend...'
-
+function LogoMark() {
   return (
-    <span style={{ color, fontSize: '0.8rem' }}>{label}</span>
+    <div style={s.logoMark}>V</div>
   )
 }
 
 export default function App() {
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <span style={styles.logo}>Verdict</span>
-          <HealthStatus />
+    <div style={s.page}>
+      <header style={s.header}>
+        <div style={s.wordmark}>
+          <LogoMark />
+          <span style={s.logoText}>
+            Verdict<span style={s.logoPeriod}>.</span>
+          </span>
         </div>
         <SignedIn>
           <UserButton />
         </SignedIn>
       </header>
 
-      <main style={styles.main}>
+      <main style={s.main}>
         <SignedOut>
-          <h1 style={styles.headline}>Read your lease.<br />Know where you stand.</h1>
-          <p style={styles.subhead}>
+          <h1 style={s.headline}>
+            Read your lease.<br />Know where you stand.
+          </h1>
+          <p style={s.subhead}>
             Paste any residential lease and get a sharp, tenant-side analysis in under a minute.
           </p>
           <SignInButton mode="modal">
-            <button style={styles.ctaBtn}>Sign in to get started</button>
+            <button style={s.ctaBtn}>Sign in to get started</button>
           </SignInButton>
         </SignedOut>
 
@@ -62,58 +43,89 @@ export default function App() {
   )
 }
 
-const styles = {
+const INK    = '#1C1917'
+const MUTED  = '#6B6459'
+const RED    = '#B91C1C'
+const CREAM  = '#F7F5F0'
+const BORDER = '#E0DDD6'
+
+const s = {
   page: {
-    fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif',
+    fontFamily: "'Instrument Sans', system-ui, sans-serif",
     minHeight: '100vh',
-    background: '#fafafa',
+    background: CREAM,
+    color: INK,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '16px 32px',
-    borderBottom: '1px solid #e5e5e5',
-    background: '#fff',
+    padding: '18px 40px',
+    borderBottom: `1px solid ${BORDER}`,
+    background: CREAM,
   },
-  headerLeft: {
+  wordmark: {
     display: 'flex',
     alignItems: 'center',
-    gap: 16,
+    gap: 10,
   },
-  logo: {
-    fontSize: '1.2rem',
+  logoMark: {
+    width: 28,
+    height: 28,
+    background: RED,
+    color: '#fff',
+    fontFamily: "'Fraunces', serif",
     fontWeight: 700,
+    fontSize: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
+    lineHeight: 1,
+    userSelect: 'none',
+  },
+  logoText: {
+    fontFamily: "'Fraunces', serif",
+    fontWeight: 700,
+    fontSize: '1.25rem',
+    color: INK,
     letterSpacing: '-0.02em',
-    color: '#1a1a1a',
+  },
+  logoPeriod: {
+    color: RED,
   },
   main: {
     maxWidth: 720,
     margin: '0 auto',
-    padding: '48px 24px',
+    padding: '56px 32px',
   },
   headline: {
-    fontSize: '2.5rem',
+    fontFamily: "'Fraunces', serif",
+    fontSize: '2.75rem',
     fontWeight: 700,
-    lineHeight: 1.2,
+    lineHeight: 1.15,
     letterSpacing: '-0.03em',
-    color: '#1a1a1a',
-    margin: '0 0 16px',
+    color: INK,
+    margin: '0 0 20px',
   },
   subhead: {
+    fontFamily: "'Instrument Sans', sans-serif",
     fontSize: '1.1rem',
-    color: '#555',
-    lineHeight: 1.6,
-    margin: '0 0 32px',
+    color: MUTED,
+    lineHeight: 1.65,
+    margin: '0 0 36px',
+    maxWidth: 520,
   },
   ctaBtn: {
-    padding: '14px 28px',
-    background: '#1a1a1a',
-    color: '#fff',
+    padding: '14px 32px',
+    background: INK,
+    color: CREAM,
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 4,
+    fontFamily: "'Instrument Sans', sans-serif",
     fontSize: '1rem',
     fontWeight: 600,
     cursor: 'pointer',
+    letterSpacing: '0.01em',
   },
 }

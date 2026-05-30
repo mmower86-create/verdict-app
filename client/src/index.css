@@ -1,9 +1,17 @@
-* {
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: #F7F5F0;
+  color: #1C1917;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #1C1917 !important;
+  box-shadow: 0 0 0 2px rgba(28, 25, 23, 0.07);
 }

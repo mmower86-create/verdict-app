@@ -1,11 +1,62 @@
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { useState, useEffect } from 'react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import DecodeWorkspace from './DecodeWorkspace'
 
 export const API = import.meta.env.VITE_API_URL || ''
 
 function LogoMark() {
+  return <div style={s.logoMark}>V</div>
+}
+
+function HeaderPlanStatus() {
+  const { getToken } = useAuth()
+  const [usage, setUsage] = useState(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+
+  useEffect(() => {
+    async function fetchUsage() {
+      try {
+        const token = await getToken()
+        const res = await fetch(`${API}/api/usage`, { headers: { Authorization: `Bearer ${token}` } })
+        if (res.ok) setUsage(await res.json())
+      } catch { /* non-critical */ }
+    }
+    fetchUsage()
+  }, [getToken])
+
+  async function handleUpgrade() {
+    setCheckoutLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API}/api/checkout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const { url } = await res.json()
+      window.location.href = url
+    } catch {
+      setCheckoutLoading(false)
+    }
+  }
+
+  if (!usage) return null
+
+  if (usage.plan === 'pro') {
+    return <span style={s.proBadge}>Pro</span>
+  }
+
   return (
-    <div style={s.logoMark}>V</div>
+    <div style={s.freeStatus}>
+      <span style={s.freeUsage}>{usage.used} of {usage.limit} free this month</span>
+      <button
+        style={{ ...s.upgradeBtn, opacity: checkoutLoading ? 0.6 : 1 }}
+        onClick={handleUpgrade}
+        disabled={checkoutLoading}
+      >
+        {checkoutLoading ? 'Loading...' : 'Upgrade'}
+      </button>
+    </div>
   )
 }
 
@@ -20,7 +71,10 @@ export default function App() {
           </span>
         </div>
         <SignedIn>
-          <UserButton />
+          <div style={s.headerRight}>
+            <HeaderPlanStatus />
+            <UserButton />
+          </div>
         </SignedIn>
       </header>
 
@@ -95,6 +149,41 @@ const s = {
   },
   logoPeriod: {
     color: RED,
+  },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+  },
+  proBadge: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.7rem',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: RED,
+    fontWeight: 500,
+  },
+  freeStatus: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  freeUsage: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.72rem',
+    color: MUTED,
+    letterSpacing: '0.03em',
+  },
+  upgradeBtn: {
+    padding: '6px 14px',
+    background: INK,
+    color: CREAM,
+    border: 'none',
+    borderRadius: 4,
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   main: {
     maxWidth: 720,

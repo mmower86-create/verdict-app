@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { API } from './App'
+import VerdictMarkdown from './VerdictMarkdown'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,22 +64,7 @@ function NarratedLoader() {
 }
 
 function VerdictDisplay({ text }) {
-  const sections = text.split(/\n(?=[A-Z][A-Z ]+\n)/)
-  return (
-    <div style={s.verdict}>
-      {sections.map((section, i) => {
-        const lines = section.trim().split('\n')
-        const heading = lines[0]
-        const body = lines.slice(1).join('\n').trim()
-        return (
-          <div key={i} style={s.section}>
-            <p style={s.sectionHeading}>{heading}</p>
-            <p style={s.sectionBody}>{body}</p>
-          </div>
-        )
-      })}
-    </div>
-  )
+  return <VerdictMarkdown text={text} style={s.verdict} />
 }
 
 function UsageBadge({ usage }) {

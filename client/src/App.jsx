@@ -64,12 +64,12 @@ export default function App() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <div style={s.wordmark}>
+        <a href="https://getverdict.net" style={s.wordmark}>
           <LogoMark />
           <span style={s.logoText}>
             Verdict<span style={s.logoPeriod}>.</span>
           </span>
-        </div>
+        </a>
         <SignedIn>
           <div style={s.headerRight}>
             <HeaderPlanStatus />
@@ -124,6 +124,8 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
+    textDecoration: 'none',
+    cursor: 'pointer',
   },
   logoMark: {
     width: 28,

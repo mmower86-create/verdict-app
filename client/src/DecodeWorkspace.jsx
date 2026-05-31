@@ -67,52 +67,108 @@ function VerdictDisplay({ text }) {
   return <VerdictMarkdown text={text} style={s.verdict} />
 }
 
+const PLAN_LABEL = { free: 'Free', pro: 'Pro', business: 'Business' }
+
 function UsageBadge({ usage }) {
   if (!usage) return null
-  if (usage.plan === 'pro') {
-    return <p style={{ ...s.usageBadge, color: RED }}>Pro &middot; unlimited decodes</p>
+  // limit === null means uncapped (owner/comp accounts only).
+  if (usage.limit === null) {
+    const label = PLAN_LABEL[usage.plan] || 'Pro'
+    return <p style={{ ...s.usageBadge, color: RED }}>{label} &middot; unlimited decodes</p>
   }
   const remaining = usage.limit - usage.used
   const color = remaining === 0 ? RED : remaining === 1 ? '#92400E' : MUTED
+  const planWord = usage.plan === 'free' ? 'free ' : ''
   return (
     <p style={{ ...s.usageBadge, color }}>
-      {usage.used} of {usage.limit} free decodes used this month
+      {usage.used} of {usage.limit} {planWord}decodes used this month
       {remaining === 1 ? '. 1 remaining.' : ''}
     </p>
   )
 }
 
-function LimitReached({ onUpgrade }) {
-  const [loading, setLoading] = useState(false)
+const PLAN_TIERS = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: '$0',
+    period: 'current plan',
+    features: ['3 lease decodes per month', 'Full verdict, red flags, and moves', 'No card required'],
+    cta: 'Your current plan',
+    featured: false,
+    current: true,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '$39',
+    period: 'per month',
+    features: ['15 decodes per month', 'All document types as they launch', 'Saved verdict history', 'Priority processing'],
+    cta: 'Upgrade to Pro',
+    featured: true,
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    price: '$79',
+    period: 'per month',
+    features: ['100 decodes per month', 'Everything in Pro', 'Commercial-use license', 'Exportable negotiating scripts'],
+    cta: 'Get Business',
+    featured: false,
+  },
+]
+
+function LimitReached({ onUpgrade, usage }) {
+  const [loadingPlan, setLoadingPlan] = useState(null)
   const [error, setError] = useState(null)
 
-  async function handleUpgrade() {
-    setLoading(true)
+  async function handleUpgrade(plan) {
+    setLoadingPlan(plan)
     setError(null)
     try {
-      const { url } = await onUpgrade()
+      const { url } = await onUpgrade(plan)
       window.location.href = url
     } catch {
       setError('Could not start checkout. Please try again.')
-      setLoading(false)
+      setLoadingPlan(null)
     }
   }
 
+  const usedLimit = usage?.limit ?? 3
   return (
-    <div style={s.limitBox}>
-      <h2 style={s.limitHeading}>You have used all 3 free decodes this month.</h2>
-      <p style={s.limitBody}>
-        Upgrade to Pro for unlimited decodes. Pro users get full access every month, no cap.
-      </p>
-      <button
-        style={{ ...s.upgradeBtn, opacity: loading ? 0.6 : 1, cursor: loading ? 'wait' : 'pointer' }}
-        onClick={handleUpgrade}
-        disabled={loading}
-      >
-        {loading ? 'Starting checkout...' : 'Upgrade to Pro'}
-      </button>
+    <div style={s.limitWrap}>
+      <h2 style={s.limitHeading}>You've used all {usedLimit} free decodes this month.</h2>
+      <p style={s.limitBody}>Pick a plan to keep going. Decodes reset on the 1st of each month.</p>
+
+      <div style={s.tierGrid}>
+        {PLAN_TIERS.map((tier) => (
+          <div key={tier.id} style={tier.featured ? { ...s.tierCard, ...s.tierCardFeatured } : s.tierCard}>
+            {tier.featured && <span style={s.tierBadge}>Recommended</span>}
+            <p style={s.tierName}>{tier.name}</p>
+            <p style={s.tierPrice}>{tier.price}<span style={s.tierPeriod}> / {tier.period === 'per month' ? 'mo' : tier.period}</span></p>
+            <ul style={s.tierFeatures}>
+              {tier.features.map((f) => <li key={f} style={s.tierFeature}>{f}</li>)}
+            </ul>
+            {tier.current ? (
+              <div style={s.tierCurrentBtn}>{tier.cta}</div>
+            ) : (
+              <button
+                style={{
+                  ...(tier.featured ? s.tierBtnFeatured : s.tierBtn),
+                  opacity: loadingPlan && loadingPlan !== tier.id ? 0.5 : 1,
+                  cursor: loadingPlan ? 'wait' : 'pointer',
+                }}
+                onClick={() => handleUpgrade(tier.id)}
+                disabled={!!loadingPlan}
+              >
+                {loadingPlan === tier.id ? 'Starting checkout...' : tier.cta}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
       {error && <p style={s.errorMsg}>{error}</p>}
-      <p style={s.limitNote}>Decodes reset on the 1st of each month.</p>
     </div>
   )
 }
@@ -182,11 +238,12 @@ export default function DecodeWorkspace() {
     fetchUsage()
   })
 
-  async function startCheckout() {
+  async function startCheckout(plan = 'pro') {
     const token = await getToken()
     const res = await fetch(`${API}/api/checkout`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ plan }),
     })
     if (!res.ok) throw new Error('checkout failed')
     return res.json()
@@ -239,7 +296,7 @@ export default function DecodeWorkspace() {
 
   if (status === 'loading') return <NarratedLoader />
 
-  if (status === 'limit_reached') return <LimitReached onUpgrade={startCheckout} />
+  if (status === 'limit_reached') return <LimitReached onUpgrade={startCheckout} usage={usage} />
 
   if (status === 'history' && activeHistoryItem) {
     return (
@@ -272,7 +329,7 @@ export default function DecodeWorkspace() {
     <div>
       <UsageBadge usage={usage} />
       {justUpgraded && (
-        <p style={s.upgradedBanner}>You are now on Pro. Unlimited decodes, starting now.</p>
+        <p style={s.upgradedBanner}>You're upgraded. Your new monthly decode limit is active now.</p>
       )}
       {status === 'error' && <p style={s.errorMsg}>{errorMsg}</p>}
       <label style={s.label} htmlFor="lease-input">Paste your lease below</label>
@@ -446,16 +503,15 @@ const s = {
     marginBottom: 16,
     fontSize: '0.875rem',
   },
-  limitBox: {
-    padding: '48px 0',
-    maxWidth: 500,
+  limitWrap: {
+    padding: '40px 0',
   },
   limitHeading: {
     fontFamily: "'Fraunces', serif",
     fontSize: '1.5rem',
     fontWeight: 600,
     color: INK,
-    margin: '0 0 12px',
+    margin: '0 0 10px',
     lineHeight: 1.25,
   },
   limitBody: {
@@ -463,25 +519,114 @@ const s = {
     fontSize: '1rem',
     color: MUTED,
     lineHeight: 1.65,
-    margin: '0 0 28px',
+    margin: '0 0 36px',
   },
-  upgradeBtn: {
-    padding: '13px 28px',
+  tierGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 16,
+    alignItems: 'center',
+    maxWidth: 760,
+  },
+  tierCard: {
+    position: 'relative',
+    background: '#fff',
+    border: `1px solid ${BORDER}`,
+    borderRadius: 14,
+    padding: '28px 22px',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  tierCardFeatured: {
+    border: `1px solid ${RED}`,
+    background: 'linear-gradient(180deg, #FEF2F2 0%, #fff 55%)',
+    boxShadow: `0 0 0 1px ${RED}, 0 12px 32px rgba(185,28,28,0.10)`,
+    transform: 'translateY(-10px) scale(1.03)',
+    zIndex: 2,
+  },
+  tierBadge: {
+    position: 'absolute',
+    top: -10,
+    left: '50%',
+    transform: 'translateX(-50%)',
     background: RED,
     color: '#fff',
-    border: 'none',
-    borderRadius: 4,
-    fontFamily: "'Instrument Sans', sans-serif",
-    fontSize: '0.95rem',
-    fontWeight: 600,
-    display: 'block',
-    marginBottom: 16,
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.6rem',
+    fontWeight: 500,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    padding: '4px 12px',
+    borderRadius: 100,
+    whiteSpace: 'nowrap',
   },
-  limitNote: {
+  tierName: {
+    fontFamily: "'Fraunces', serif",
+    fontSize: '1.15rem',
+    fontWeight: 600,
+    color: INK,
+    margin: '0 0 6px',
+  },
+  tierPrice: {
+    fontFamily: "'Fraunces', serif",
+    fontSize: '2rem',
+    fontWeight: 600,
+    color: INK,
+    lineHeight: 1,
+    margin: '0 0 18px',
+  },
+  tierPeriod: {
     fontFamily: "'Instrument Sans', sans-serif",
     fontSize: '0.8rem',
+    fontWeight: 500,
     color: MUTED,
-    margin: 0,
+  },
+  tierFeatures: {
+    listStyle: 'none',
+    padding: 0,
+    margin: '0 0 22px',
+    flex: 1,
+  },
+  tierFeature: {
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.82rem',
+    color: INK,
+    lineHeight: 1.45,
+    padding: '7px 0',
+    borderBottom: `1px solid ${BORDER}`,
+  },
+  tierBtn: {
+    padding: '11px 16px',
+    background: '#fff',
+    color: INK,
+    border: `1px solid ${INK}`,
+    borderRadius: 8,
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+  tierBtnFeatured: {
+    padding: '11px 16px',
+    background: RED,
+    color: '#fff',
+    border: `1px solid ${RED}`,
+    borderRadius: 8,
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+  tierCurrentBtn: {
+    padding: '11px 16px',
+    background: 'transparent',
+    color: MUTED,
+    border: `1px solid ${BORDER}`,
+    borderRadius: 8,
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    textAlign: 'center',
   },
   historySection: {
     marginTop: 64,

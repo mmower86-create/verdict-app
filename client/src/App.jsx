@@ -42,8 +42,11 @@ function HeaderPlanStatus() {
 
   if (!usage) return null
 
-  if (usage.plan === 'pro') {
-    return <span style={s.proBadge}>Pro</span>
+  // Any paid plan (pro/business) or a comped uncapped account shows a plain badge,
+  // never the upgrade prompt.
+  if (usage.plan === 'pro' || usage.plan === 'business' || usage.limit === null) {
+    const label = usage.plan === 'business' ? 'Business' : 'Pro'
+    return <span style={s.proBadge}>{label}</span>
   }
 
   return (

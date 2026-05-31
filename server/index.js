@@ -19,7 +19,14 @@ const promptFiles = {
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const FREE_LIMIT = 3;
+// Monthly decode caps per plan. An account with users.unlimited = true (owner/
+// comp only -- NOT a sellable tier) bypasses the cap entirely.
+const PLAN_LIMITS = { free: 3, pro: 15, business: 100 };
+const FREE_LIMIT = PLAN_LIMITS.free; // kept for any legacy references
+function limitForUser(user) {
+  if (user.unlimited) return null; // null = uncapped
+  return PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
+}
 
 app.use(cors({ origin: CLIENT_URL }));
 
@@ -39,16 +46,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const clerkUserId = session.metadata.clerk_user_id;
-    const isFounder = session.metadata.is_founder === 'true';
+    // Plan purchased: 'business' or 'pro' (default). Older sessions without the
+    // metadata fall back to 'pro' to preserve existing behavior.
+    const plan = session.metadata.plan === 'business' ? 'business' : 'pro';
+    // Founder flag only applies to Pro; business is never a founder slot.
+    const isFounder = plan === 'pro' && session.metadata.is_founder === 'true';
     const stripeCustomerId = session.customer;
 
     const { error } = await supabase
       .from('users')
-      .update({ plan: 'pro', is_founder: isFounder, stripe_customer_id: stripeCustomerId })
+      .update({ plan, is_founder: isFounder, stripe_customer_id: stripeCustomerId })
       .eq('clerk_user_id', clerkUserId);
 
     if (error) console.error('Webhook activate failed:', error.message);
-    else console.log(`Activated pro for ${clerkUserId} (founder=${isFounder})`);
+    else console.log(`Activated ${plan} for ${clerkUserId} (founder=${isFounder})`);
   }
 
   if (event.type === 'customer.subscription.deleted') {
@@ -126,8 +137,8 @@ app.get('/api/usage', requireAuth(), async (req, res) => {
   try {
     const user = await getOrCreateUser(userId);
     const used = await countDecodesThisMonth(userId);
-    const limit = user.plan === 'pro' ? null : FREE_LIMIT;
-    res.json({ plan: user.plan, used, limit });
+    // limit === null means truly uncapped (unlimited accounts only).
+    res.json({ plan: user.plan, used, limit: limitForUser(user) });
   } catch (err) {
     console.error('Usage error:', err.message);
     res.status(500).json({ error: 'Could not load usage.' });
@@ -140,14 +151,28 @@ app.post('/api/checkout', requireAuth(), async (req, res) => {
   try {
     const user = await getOrCreateUser(userId);
 
-    // Founder slot check: anyone who has ever been a founder counts toward the
-    // 100 cap (see founderCount). A cancelled founder keeps their slot, so it is
-    // never re-released -- exactly 100 people ever get founder pricing.
-    const founders = await founderCount();
-    const isFounder = founders < 100;
-    const priceId = isFounder
-      ? process.env.STRIPE_PRICE_FOUNDER
-      : process.env.STRIPE_PRICE_STANDARD;
+    // Which tier is being purchased. Defaults to 'pro' for backward compatibility
+    // with the existing single-button checkout.
+    const requestedPlan = req.body?.plan === 'business' ? 'business' : 'pro';
+
+    let priceId;
+    let isFounder = false;
+
+    if (requestedPlan === 'business') {
+      priceId = process.env.STRIPE_PRICE_BUSINESS;
+      if (!priceId) {
+        return res.status(503).json({ error: 'Business plan is not available yet.' });
+      }
+    } else {
+      // Founder slot check (Pro only): anyone who has ever been a founder counts
+      // toward the 100 cap (see founderCount). A cancelled founder keeps their
+      // slot, so it is never re-released -- exactly 100 people ever get founder pricing.
+      const founders = await founderCount();
+      isFounder = founders < 100;
+      priceId = isFounder
+        ? process.env.STRIPE_PRICE_FOUNDER
+        : process.env.STRIPE_PRICE_STANDARD;
+    }
 
     // Reuse existing Stripe customer if we have one
     let customerId = user.stripe_customer_id;
@@ -170,6 +195,7 @@ app.post('/api/checkout', requireAuth(), async (req, res) => {
       cancel_url: `${CLIENT_URL}/`,
       metadata: {
         clerk_user_id: userId,
+        plan: requestedPlan,
         is_founder: String(isFounder),
       },
     });
@@ -199,8 +225,10 @@ app.post('/api/decode', requireAuth(), async (req, res) => {
     const user = await getOrCreateUser(userId);
     const used = await countDecodesThisMonth(userId);
 
-    if (user.plan === 'free' && used >= FREE_LIMIT) {
-      return res.status(402).json({ error: 'limit_reached', used, limit: FREE_LIMIT });
+    // Per-plan monthly cap. limit === null means uncapped (owner/comp accounts).
+    const limit = limitForUser(user);
+    if (limit !== null && used >= limit) {
+      return res.status(402).json({ error: 'limit_reached', used, limit });
     }
 
     const message = await anthropic.messages.create({

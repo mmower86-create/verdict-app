@@ -102,11 +102,14 @@ async function countDecodesThisMonth(clerkUserId) {
 }
 
 async function founderCount() {
+  // Count everyone who has EVER claimed a founder slot, regardless of current
+  // plan. A founder who later cancels keeps `is_founder = true` (only `plan`
+  // flips to 'free'), so their slot stays consumed forever -- the cap is a
+  // permanent "first 100 people", not "100 currently-active subscribers".
   const { count, error } = await supabase
     .from('users')
     .select('*', { count: 'exact', head: true })
-    .eq('is_founder', true)
-    .eq('plan', 'pro');
+    .eq('is_founder', true);
 
   if (error) throw new Error(`founderCount failed: ${error.message}`);
   return count;
@@ -137,8 +140,9 @@ app.post('/api/checkout', requireAuth(), async (req, res) => {
   try {
     const user = await getOrCreateUser(userId);
 
-    // Founder slot check: only active pro founders count toward the 100 cap.
-    // A cancelled founder has plan='free' and is excluded, so their slot is gone.
+    // Founder slot check: anyone who has ever been a founder counts toward the
+    // 100 cap (see founderCount). A cancelled founder keeps their slot, so it is
+    // never re-released -- exactly 100 people ever get founder pricing.
     const founders = await founderCount();
     const isFounder = founders < 100;
     const priceId = isFounder

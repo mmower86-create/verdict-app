@@ -239,6 +239,28 @@ app.post('/api/checkout', requireAuth(), async (req, res) => {
   }
 });
 
+// Billing portal -- lets an existing subscriber upgrade/downgrade/cancel via
+// Stripe's hosted portal. Stripe swaps the subscription (with proration) rather
+// than creating a second one, so it inherently prevents double-charging and
+// blocks "buying" a plan you already have.
+app.post('/api/portal', requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  try {
+    const user = await getOrCreateUser(userId);
+    if (!user.stripe_customer_id) {
+      return res.status(400).json({ error: 'No subscription to manage yet.' });
+    }
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: CLIENT_URL,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Portal error:', err.message);
+    res.status(500).json({ error: 'Could not open billing management. Please try again.' });
+  }
+});
+
 // Decode -- Clerk session required, free-tier gate enforced server-side
 app.post('/api/decode', requireAuth(), async (req, res) => {
   const { userId } = getAuth(req);
@@ -309,7 +331,7 @@ app.get('/api/history', requireAuth(), async (req, res) => {
       .select('id, created_at, doc_type, result_text')
       .eq('clerk_user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(100);
 
     if (error) throw new Error(error.message);
     res.json(data);

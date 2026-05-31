@@ -173,27 +173,92 @@ function LimitReached({ onUpgrade, usage }) {
   )
 }
 
+// Pull a short, human title out of a verdict's text so history rows are
+// distinguishable instead of all reading "Lease analysis". Falls back gracefully.
+function verdictSnippet(text) {
+  if (!text) return 'Lease analysis'
+  let t = String(text).replace(/\r/g, '')
+  t = t.replace(/^\s*THE VERDICT\s*:?\s*/i, '') // drop the leading section label
+  const line = t.split('\n').map((l) => l.trim()).find(Boolean) || ''
+  const clean = line.replace(/\*\*/g, '').replace(/[#>`_]/g, '').trim()
+  if (!clean) return 'Lease analysis'
+  return clean.length > 90 ? clean.slice(0, 90).replace(/\s+\S*$/, '') + '…' : clean
+}
+
+// Bucket a timestamp into a coarse group for sectioned history.
+function historyGroupOf(iso) {
+  const d = new Date(iso)
+  const now = new Date()
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const day = 86400000
+  if (d >= startToday) return 'Today'
+  if (d >= new Date(startToday.getTime() - 6 * day)) return 'This week'
+  if (d >= new Date(now.getFullYear(), now.getMonth(), 1)) return 'Earlier this month'
+  return 'Older'
+}
+
+const HISTORY_GROUP_ORDER = ['Today', 'This week', 'Earlier this month', 'Older']
+
 function HistorySection({ items, onSelect }) {
+  const [query, setQuery] = useState('')
   if (!items || items.length === 0) return null
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? items.filter((it) =>
+        verdictSnippet(it.result_text).toLowerCase().includes(q) ||
+        (it.doc_type || '').toLowerCase().includes(q) ||
+        (it.result_text || '').toLowerCase().includes(q)
+      )
+    : items
+
+  const groups = {}
+  for (const it of filtered) {
+    const g = historyGroupOf(it.created_at)
+    ;(groups[g] = groups[g] || []).push(it)
+  }
+
   return (
     <div style={s.historySection}>
-      <p style={s.historyLabel}>Past verdicts</p>
-      <ul style={s.historyList}>
-        {items.map((item) => (
-          <li
-            key={item.id}
-            style={s.historyItem}
-            onClick={() => onSelect(item)}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(28,25,23,0.03)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <span style={s.historyDocType}>
-              {item.doc_type === 'lease' ? 'Lease analysis' : item.doc_type}
-            </span>
-            <span style={s.historyDate}>{formatDate(item.created_at)}</span>
-          </li>
-        ))}
-      </ul>
+      <div style={s.historyHead}>
+        <p style={s.historyLabel}>Past verdicts</p>
+        <input
+          style={s.historySearch}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search past verdicts..."
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p style={s.historyEmpty}>No verdicts match that search.</p>
+      ) : (
+        HISTORY_GROUP_ORDER.filter((g) => groups[g]).map((g) => (
+          <div key={g} style={s.historyGroup}>
+            <p style={s.historyGroupLabel}>{g}</p>
+            <ul style={s.historyList}>
+              {groups[g].map((item) => (
+                <li
+                  key={item.id}
+                  style={s.historyItem}
+                  onClick={() => onSelect(item)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(28,25,23,0.03)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span style={s.historyItemMain}>
+                    <span style={s.historyDocType}>
+                      {item.doc_type === 'lease' ? 'Lease' : item.doc_type}
+                    </span>
+                    <span style={s.historySnippet}>{verdictSnippet(item.result_text)}</span>
+                  </span>
+                  <span style={s.historyDate}>{formatDate(item.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
     </div>
   )
 }
@@ -646,21 +711,80 @@ const s = {
     padding: 0,
     margin: 0,
   },
-  historyItem: {
+  historyHead: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 16,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  historySearch: {
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.85rem',
+    padding: '8px 12px',
+    border: `1px solid ${BORDER}`,
+    borderRadius: 6,
+    background: '#fff',
+    color: INK,
+    width: 220,
+    maxWidth: '100%',
+    outline: 'none',
+  },
+  historyEmpty: {
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.9rem',
+    color: MUTED,
+    margin: '8px 0 0',
+  },
+  historyGroup: {
+    marginBottom: 20,
+  },
+  historyGroupLabel: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.62rem',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: MUTED,
+    margin: '0 0 6px',
+  },
+  historyItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 16,
     padding: '14px 4px',
     borderBottom: `1px solid ${BORDER}`,
     cursor: 'pointer',
     borderRadius: 2,
     transition: 'background 0.15s ease',
   },
+  historyItemMain: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    minWidth: 0,
+    flex: 1,
+  },
   historyDocType: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.6rem',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: RED,
+    fontWeight: 500,
+  },
+  historySnippet: {
     fontFamily: "'Instrument Sans', sans-serif",
-    fontSize: '0.95rem',
+    fontSize: '0.92rem',
     color: INK,
     fontWeight: 500,
+    lineHeight: 1.4,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
   },
   historyDate: {
     fontFamily: "'Geist Mono', monospace",

@@ -12,6 +12,7 @@ function HeaderPlanStatus() {
   const { getToken } = useAuth()
   const [usage, setUsage] = useState(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   useEffect(() => {
     async function fetchUsage() {
@@ -167,6 +168,17 @@ const s = {
     textTransform: 'uppercase',
     color: RED,
     fontWeight: 500,
+  },
+  manageBtn: {
+    padding: '6px 14px',
+    background: 'transparent',
+    color: INK,
+    border: `1px solid ${BORDER}`,
+    borderRadius: 4,
+    fontFamily: "'Instrument Sans', sans-serif",
+    fontSize: '0.8rem',
+    fontWeight: 500,
+    cursor: 'pointer',
   },
   freeStatus: {
     display: 'flex',

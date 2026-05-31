@@ -199,8 +199,31 @@ function historyGroupOf(iso) {
 
 const HISTORY_GROUP_ORDER = ['Today', 'This week', 'Earlier this month', 'Older']
 
+function HistoryRow({ item, onSelect }) {
+  return (
+    <li
+      style={s.historyItem}
+      onClick={() => onSelect(item)}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(28,25,23,0.03)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+    >
+      <span style={s.historyItemMain}>
+        <span style={s.historyDocType}>
+          {item.doc_type === 'lease' ? 'Lease' : item.doc_type}
+        </span>
+        <span style={s.historySnippet}>{verdictSnippet(item.result_text)}</span>
+      </span>
+      <span style={s.historyDate}>{formatDate(item.created_at)}</span>
+    </li>
+  )
+}
+
 function HistorySection({ items, onSelect }) {
   const [query, setQuery] = useState('')
+  // Which date-groups are collapsed. The most recent group stays open; older
+  // ones start collapsed so a heavy user sees a short, scannable list.
+  const [collapsed, setCollapsed] = useState({})
+
   if (!items || items.length === 0) return null
 
   const q = query.trim().toLowerCase()
@@ -217,11 +240,16 @@ function HistorySection({ items, onSelect }) {
     const g = historyGroupOf(it.created_at)
     ;(groups[g] = groups[g] || []).push(it)
   }
+  const activeGroups = HISTORY_GROUP_ORDER.filter((g) => groups[g])
+
+  // When searching, force everything open so matches are never hidden.
+  const isOpen = (g, i) => (q ? true : !(collapsed[g] ?? i !== 0))
+  const toggle = (g) => setCollapsed((c) => ({ ...c, [g]: !(c[g] ?? false) }))
 
   return (
     <div style={s.historySection}>
       <div style={s.historyHead}>
-        <p style={s.historyLabel}>Past verdicts</p>
+        <p style={s.historyLabel}>Past verdicts <span style={s.historyCount}>{items.length}</span></p>
         <input
           style={s.historySearch}
           type="text"
@@ -234,30 +262,33 @@ function HistorySection({ items, onSelect }) {
       {filtered.length === 0 ? (
         <p style={s.historyEmpty}>No verdicts match that search.</p>
       ) : (
-        HISTORY_GROUP_ORDER.filter((g) => groups[g]).map((g) => (
-          <div key={g} style={s.historyGroup}>
-            <p style={s.historyGroupLabel}>{g}</p>
-            <ul style={s.historyList}>
-              {groups[g].map((item) => (
-                <li
-                  key={item.id}
-                  style={s.historyItem}
-                  onClick={() => onSelect(item)}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(28,25,23,0.03)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        <div style={s.historyScroll}>
+          {activeGroups.map((g, i) => {
+            const open = isOpen(g, i)
+            return (
+              <div key={g} style={s.historyGroup}>
+                <button
+                  type="button"
+                  style={s.historyGroupHeader}
+                  onClick={() => toggle(g)}
                 >
-                  <span style={s.historyItemMain}>
-                    <span style={s.historyDocType}>
-                      {item.doc_type === 'lease' ? 'Lease' : item.doc_type}
-                    </span>
-                    <span style={s.historySnippet}>{verdictSnippet(item.result_text)}</span>
+                  <span style={s.historyGroupLabel}>{g}</span>
+                  <span style={s.historyGroupMeta}>
+                    {groups[g].length}
+                    <span style={s.historyChevron}>{open ? '−' : '+'}</span>
                   </span>
-                  <span style={s.historyDate}>{formatDate(item.created_at)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))
+                </button>
+                {open && (
+                  <ul style={s.historyList}>
+                    {groups[g].map((item) => (
+                      <HistoryRow key={item.id} item={item} onSelect={onSelect} />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
@@ -737,8 +768,33 @@ const s = {
     color: MUTED,
     margin: '8px 0 0',
   },
+  historyCount: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.62rem',
+    color: MUTED,
+    marginLeft: 8,
+    opacity: 0.7,
+  },
+  historyScroll: {
+    maxHeight: 420,
+    overflowY: 'auto',
+    paddingRight: 6,
+    marginRight: -6,
+  },
   historyGroup: {
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  historyGroupHeader: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: `1px solid ${BORDER}`,
+    padding: '8px 2px',
+    cursor: 'pointer',
+    textAlign: 'left',
   },
   historyGroupLabel: {
     fontFamily: "'Geist Mono', monospace",
@@ -746,7 +802,22 @@ const s = {
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
     color: MUTED,
-    margin: '0 0 6px',
+  },
+  historyGroupMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.62rem',
+    color: MUTED,
+  },
+  historyChevron: {
+    fontFamily: "'Geist Mono', monospace",
+    fontSize: '0.9rem',
+    color: MUTED,
+    width: 12,
+    textAlign: 'center',
+    lineHeight: 1,
   },
   historyItem: {
     display: 'flex',

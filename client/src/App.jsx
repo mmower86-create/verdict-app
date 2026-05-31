@@ -41,13 +41,46 @@ function HeaderPlanStatus() {
     }
   }
 
+  async function handleManage() {
+    setPortalLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API}/api/portal`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const { url } = await res.json()
+      window.location.href = url
+    } catch {
+      setPortalLoading(false)
+    }
+  }
+
   if (!usage) return null
 
-  // Any paid plan (pro/business) or a comped uncapped account shows a plain badge,
-  // never the upgrade prompt.
-  if (usage.plan === 'pro' || usage.plan === 'business' || usage.limit === null) {
+  // Paid accounts (pro/business) get a badge + 'Manage plan' -> Stripe portal to
+  // upgrade/downgrade/cancel. Comped uncapped accounts (no real subscription)
+  // show just the badge. Stripe swaps the sub, so no double-charge.
+  if (usage.plan === 'pro' || usage.plan === 'business') {
     const label = usage.plan === 'business' ? 'Business' : 'Pro'
-    return <span style={s.proBadge}>{label}</span>
+    return (
+      <div style={s.freeStatus}>
+        <span style={s.proBadge}>{label}</span>
+        <button
+          style={{ ...s.manageBtn, opacity: portalLoading ? 0.6 : 1 }}
+          onClick={handleManage}
+          disabled={portalLoading}
+        >
+          {portalLoading ? 'Loading...' : 'Manage plan'}
+        </button>
+      </div>
+    )
+  }
+
+  // Comped / uncapped account with no sellable plan: badge only.
+  if (usage.limit === null) {
+    return <span style={s.proBadge}>Pro</span>
   }
 
   return (

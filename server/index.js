@@ -28,6 +28,12 @@ function limitForUser(user) {
   return PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
 }
 
+// Minimum characters before we even attempt analysis. Anything shorter is
+// obviously not a document -- rejected for free, no API call, no decode counted.
+const MIN_DECODE_CHARS = 150;
+// Human description of each supported doc type, used by the document classifier.
+const DOC_LABEL = { lease: 'an apartment or residential lease / rental agreement' };
+
 app.use(cors({ origin: CLIENT_URL }));
 
 // Webhook must receive the raw body for signature verification.
@@ -126,6 +132,32 @@ async function founderCount() {
   return count;
 }
 
+// Lightweight gate: does the pasted text actually look like the document type
+// the user selected? Uses a cheap, low-token classification call. Fails OPEN
+// (returns true) on any error so a classifier hiccup never blocks a real decode.
+async function looksLikeDocType(docType, text) {
+  const expected = DOC_LABEL[docType];
+  if (!expected) return true; // unknown types are handled by the prompt check
+  try {
+    const probe = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 5,
+      system:
+        `You are a strict document classifier. The user will paste some text. ` +
+        `Reply with exactly one word and nothing else: MATCH if the text is ${expected}, ` +
+        `or OTHER if it is something else (a spreadsheet, financial record, email, ` +
+        `resume, article, a contract of a different kind, or random text). ` +
+        `If you are unsure, reply MATCH.`,
+      messages: [{ role: 'user', content: text.slice(0, 4000) }],
+    });
+    const verdict = (probe.content?.[0]?.text || '').toUpperCase();
+    return !verdict.includes('OTHER');
+  } catch (err) {
+    console.error('Doc classify failed, allowing through:', err.message);
+    return true; // fail open -- never block a real decode on a classifier error
+  }
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => {
@@ -221,6 +253,13 @@ app.post('/api/decode', requireAuth(), async (req, res) => {
     return res.status(400).json({ error: `Unknown docType: ${docType}` });
   }
 
+  // Reject obviously-too-short input for free, before any API call or decode count.
+  if (text.trim().length < MIN_DECODE_CHARS) {
+    return res.status(422).json({
+      error: "That looks too short to be a lease. Paste the full lease text and try again.",
+    });
+  }
+
   try {
     const user = await getOrCreateUser(userId);
     const used = await countDecodesThisMonth(userId);
@@ -229,6 +268,14 @@ app.post('/api/decode', requireAuth(), async (req, res) => {
     const limit = limitForUser(user);
     if (limit !== null && used >= limit) {
       return res.status(402).json({ error: 'limit_reached', used, limit });
+    }
+
+    // Make sure they actually pasted the supported document type. Runs before the
+    // expensive decode and before counting, so non-leases never burn a decode.
+    if (!(await looksLikeDocType(docType, text))) {
+      return res.status(422).json({
+        error: "This doesn't look like a lease. Verdict currently reads apartment and rental leases, so paste the full lease text and try again. More document types are coming soon.",
+      });
     }
 
     const message = await anthropic.messages.create({

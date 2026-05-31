@@ -68,6 +68,29 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     else console.log(`Activated ${plan} for ${clerkUserId} (founder=${isFounder})`);
   }
 
+  // Plan switch via the billing portal (e.g. Business <-> Pro). Stripe swaps the
+  // subscription's price and fires this event; sync the plan back to Supabase so
+  // the in-app cap matches what they now pay for. Cancellations come through the
+  // separate deleted handler below, so ignore non-active statuses here.
+  if (event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object;
+    const stripeCustomerId = subscription.customer;
+    const status = subscription.status;
+
+    if (status === 'active' || status === 'trialing') {
+      const priceId = subscription.items?.data?.[0]?.price?.id;
+      const plan = priceId === process.env.STRIPE_PRICE_BUSINESS ? 'business' : 'pro';
+
+      const { error } = await supabase
+        .from('users')
+        .update({ plan })
+        .eq('stripe_customer_id', stripeCustomerId);
+
+      if (error) console.error('Webhook plan-switch failed:', error.message);
+      else console.log(`Switched ${stripeCustomerId} to ${plan} (price ${priceId})`);
+    }
+  }
+
   if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object;
     const stripeCustomerId = subscription.customer;

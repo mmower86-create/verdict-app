@@ -40,11 +40,16 @@ const topic = args.topic || null;
 const PLATFORMS = {
   x: {
     label: 'X / Twitter',
+    // singlePost mode: the whole thing must fit one tweet (free accounts have no
+    // long-post / thread compose). HARD LIMIT enforced after generation.
+    maxChars: 280,
     format:
-      'A single punchy post OR a short thread (2-5 tweets). Lead with the most ' +
-      'specific scary clause as a hook. Under 280 chars per tweet. End with a ' +
-      'soft nudge to verdict (getverdict.net), not a hard sell. Use line breaks, ' +
-      'no hashtag spam (0-2 max).',
+      'A SINGLE post that MUST be 275 characters or fewer INCLUDING the url and ' +
+      'all line breaks (free X accounts cannot post longer). Lead with the most ' +
+      'specific scary clause as a hook. End with getverdict.net on its own line. ' +
+      'Use short line breaks for rhythm. No hashtags. Count your characters and ' +
+      'stay under 275 -- if it is too long, cut words until it fits. Brevity is ' +
+      'mandatory, not optional.',
   },
   linkedin: {
     label: 'LinkedIn',
@@ -108,13 +113,29 @@ async function generateOne(i) {
     `beyond reading leases (job offers, vendor contracts, ToS are "coming soon", ` +
     `not live).`;
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1200,
-    system,
-    messages: [{ role: 'user', content: `Write a ${p.label} post about: ${thisTopic}` }],
-  });
-  return { topic: thisTopic, text: msg.content[0].text.trim() };
+  let text = '';
+  // For length-capped platforms (X), regenerate up to a few times if the model
+  // overshoots, asking progressively harder to cut. Guarantees a postable draft.
+  const limit = p.maxChars || null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const nudge =
+      attempt === 0
+        ? ''
+        : `\n\nYour previous attempt was ${text.length} characters, which is OVER ` +
+          `the ${limit} limit. Rewrite it SHORTER. Cut whole sentences if needed. ` +
+          `It MUST be ${limit} characters or fewer including the url.`;
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1200,
+      system,
+      messages: [{ role: 'user', content: `Write a ${p.label} post about: ${thisTopic}${nudge}` }],
+    });
+    text = msg.content[0].text.trim();
+    if (!limit || text.length <= limit) break;
+  }
+
+  const over = limit && text.length > limit;
+  return { topic: thisTopic, text, chars: text.length, over };
 }
 
 (async () => {
@@ -127,7 +148,8 @@ async function generateOne(i) {
       const post = await generateOne(i);
       posts.push(post);
       console.log('─'.repeat(60));
-      console.log(`POST ${i + 1}  ·  topic: ${post.topic}`);
+      const charNote = post.chars != null ? `  ·  ${post.chars} chars${post.over ? ' ⚠️ OVER LIMIT — trim before posting' : ' ✅'}` : '';
+      console.log(`POST ${i + 1}  ·  topic: ${post.topic}${charNote}`);
       console.log('─'.repeat(60));
       console.log(post.text);
       console.log('');

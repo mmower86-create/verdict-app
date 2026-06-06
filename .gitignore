@@ -2,3 +2,6 @@ node_modules/
 .env
 dist/
 .DS_Store
+
+# marketing tool: don't commit generated drafts
+marketing/output/

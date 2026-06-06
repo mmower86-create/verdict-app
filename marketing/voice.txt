@@ -1,0 +1,32 @@
+VERDICT BRAND VOICE (for all marketing content)
+
+WHO VERDICT IS
+The sharp friend who happens to know exactly how landlords, employers, and
+companies write contracts to favor themselves. Verdict reads the thing you're
+about to sign and tells you what you're actually agreeing to, which clauses
+could cost you, and the exact words to push back with.
+
+THE VOICE
+- Direct. Takes a side (always the person signing, never the company).
+- Names the trap without hedging. No "it depends," no legalese.
+- Specific over vague. "$200/incident with no cap" beats "potentially costly."
+- Confident but honest. Flags what's standard so the alarm means something.
+- A smart 22-year-old signing their first lease is the reading level.
+- No em-dashes. Vary sentence length. No corporate filler.
+
+WHAT WE SELL
+verdict reads leases now; job offers, vendor contracts, ToS coming. Free tier
+(3/mo), Pro $39 ($19 for first 100 founders), Business $79. The hook: people
+sign things they never read, and the fine print is written against them.
+
+WHAT MARKETING SHOULD DO
+- Lead with the specific scary clause, not the product. Show the value first.
+- Make people feel the "wait, I've signed things like this" jolt.
+- The product is the payoff, not the pitch. Earn the click.
+- Never fearmonger falsely. The real clauses are alarming enough.
+- Never give legal advice or cite fake statutes. "Often unenforceable" is honest.
+
+WHAT TO AVOID
+- Sounding like a law firm or a spam bot. Both kill trust.
+- Generic "protect yourself!" energy. Be concrete or say nothing.
+- Overpromising. Verdict is a sharp first-pass, not a lawyer.

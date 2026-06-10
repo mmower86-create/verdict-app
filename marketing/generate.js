@@ -111,7 +111,9 @@ async function generateOne(i) {
     `use exactly "getverdict.net" and nothing else. Do not make up @handles, ` +
     `prices other than Free / Pro $39 / $19 founder / Business $79, or features ` +
     `beyond reading leases (job offers, vendor contracts, ToS are "coming soon", ` +
-    `not live).`;
+    `not live).\n\n` +
+    `ABSOLUTE RULE: NEVER use em-dashes (—) or en-dashes (–). Use periods or ` +
+    `commas instead. This is non-negotiable brand style.`;
 
   let text = '';
   // For length-capped platforms (X), regenerate up to a few times if the model
@@ -130,12 +132,23 @@ async function generateOne(i) {
       system,
       messages: [{ role: 'user', content: `Write a ${p.label} post about: ${thisTopic}${nudge}` }],
     });
-    text = msg.content[0].text.trim();
+    text = cleanText(msg.content[0].text);
     if (!limit || text.length <= limit) break;
   }
 
   const over = limit && text.length > limit;
   return { topic: thisTopic, text, chars: text.length, over };
+}
+
+// Deterministic post-processing the model can't skip. Brand rule: NO em-dashes
+// ever. Replace em/en dashes with a comma+space (or just trim doubles), since
+// the model keeps slipping them in despite instructions.
+function cleanText(raw) {
+  return String(raw)
+    .replace(/\s*[—–]\s*/g, ', ')   // em/en dash -> comma
+    .replace(/ ,/g, ',')             // tidy any " ," artifacts
+    .replace(/,\s*,/g, ',')          // collapse double commas
+    .trim();
 }
 
 (async () => {

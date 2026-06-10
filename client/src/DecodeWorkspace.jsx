@@ -96,7 +96,6 @@ const PLAN_TIERS = [
     features: ['3 lease decodes per month', 'Full verdict, red flags, and moves', 'No card required'],
     cta: 'Your current plan',
     featured: false,
-    current: true,
   },
   {
     id: 'pro',
@@ -134,38 +133,58 @@ function LimitReached({ onUpgrade, usage }) {
     }
   }
 
+  const plan = usage?.plan || 'free'
+  const isPaid = plan === 'pro' || plan === 'business'
+  const currentTierId = plan === 'pro' ? 'pro' : plan === 'business' ? 'business' : 'starter'
   const usedLimit = usage?.limit ?? 3
+
+  // For subscribers, /api/checkout returns a billing-portal URL (the server
+  // never sells a second subscription), so "Switch to X" lands in the portal.
+  const ctaFor = (tier) => (isPaid ? `Switch to ${tier.name}` : tier.cta)
+
   return (
     <div style={s.limitWrap}>
-      <h2 style={s.limitHeading}>You've used all {usedLimit} free decodes this month.</h2>
-      <p style={s.limitBody}>Pick a plan to keep going. Decodes reset on the 1st of each month.</p>
+      <h2 style={s.limitHeading}>
+        You've used all {usedLimit} {plan === 'free' ? 'free ' : ''}decodes this month.
+      </h2>
+      <p style={s.limitBody}>
+        {isPaid
+          ? 'Decodes reset on the 1st of each month. Need more before then? Switch plans below — Stripe prorates the change.'
+          : 'Pick a plan to keep going. Decodes reset on the 1st of each month.'}
+      </p>
 
       <div style={s.tierGrid}>
-        {PLAN_TIERS.map((tier) => (
-          <div key={tier.id} style={tier.featured ? { ...s.tierCard, ...s.tierCardFeatured } : s.tierCard}>
-            {tier.featured && <span style={s.tierBadge}>Recommended</span>}
-            <p style={s.tierName}>{tier.name}</p>
-            <p style={s.tierPrice}>{tier.price}<span style={s.tierPeriod}> / {tier.period === 'per month' ? 'mo' : tier.period}</span></p>
-            <ul style={s.tierFeatures}>
-              {tier.features.map((f) => <li key={f} style={s.tierFeature}>{f}</li>)}
-            </ul>
-            {tier.current ? (
-              <div style={s.tierCurrentBtn}>{tier.cta}</div>
-            ) : (
-              <button
-                style={{
-                  ...(tier.featured ? s.tierBtnFeatured : s.tierBtn),
-                  opacity: loadingPlan && loadingPlan !== tier.id ? 0.5 : 1,
-                  cursor: loadingPlan ? 'wait' : 'pointer',
-                }}
-                onClick={() => handleUpgrade(tier.id)}
-                disabled={!!loadingPlan}
-              >
-                {loadingPlan === tier.id ? 'Starting checkout...' : tier.cta}
-              </button>
-            )}
-          </div>
-        ))}
+        {PLAN_TIERS.map((tier) => {
+          const isCurrent = tier.id === currentTierId
+          const isStarterForPaid = tier.id === 'starter' && isPaid
+          return (
+            <div key={tier.id} style={tier.featured ? { ...s.tierCard, ...s.tierCardFeatured } : s.tierCard}>
+              {tier.featured && <span style={s.tierBadge}>Recommended</span>}
+              <p style={s.tierName}>{tier.name}</p>
+              <p style={s.tierPrice}>{tier.price}<span style={s.tierPeriod}> / {tier.period === 'per month' ? 'mo' : tier.period}</span></p>
+              <ul style={s.tierFeatures}>
+                {tier.features.map((f) => <li key={f} style={s.tierFeature}>{f}</li>)}
+              </ul>
+              {isCurrent ? (
+                <div style={s.tierCurrentBtn}>Your current plan</div>
+              ) : isStarterForPaid ? (
+                <div style={s.tierCurrentBtn}>Downgrade via Manage plan</div>
+              ) : (
+                <button
+                  style={{
+                    ...(tier.featured ? s.tierBtnFeatured : s.tierBtn),
+                    opacity: loadingPlan && loadingPlan !== tier.id ? 0.5 : 1,
+                    cursor: loadingPlan ? 'wait' : 'pointer',
+                  }}
+                  onClick={() => handleUpgrade(tier.id)}
+                  disabled={!!loadingPlan}
+                >
+                  {loadingPlan === tier.id ? 'Opening...' : ctaFor(tier)}
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {error && <p style={s.errorMsg}>{error}</p>}
@@ -311,8 +330,25 @@ export default function DecodeWorkspace() {
     try {
       const token = await getToken()
       const res = await fetch(`${API}/api/usage`, { headers: { Authorization: `Bearer ${token}` } })
-      if (res.ok) setUsage(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        setUsage(data)
+        return data
+      }
     } catch { /* non-critical */ }
+    return null
+  }
+
+  // The Stripe webhook that flips the plan can land after the checkout
+  // redirect, so a single fetch right on return often still reads "free".
+  // Poll briefly until the plan shows up, then nudge the header badge.
+  async function pollUsageAfterUpgrade() {
+    for (const delay of [0, 1500, 3500, 7000]) {
+      if (delay) await new Promise((r) => setTimeout(r, delay))
+      const u = await fetchUsage()
+      if (u && u.plan !== 'free') break
+    }
+    window.dispatchEvent(new Event('verdict:usage-refresh'))
   }
 
   async function fetchHistory() {
@@ -331,7 +367,7 @@ export default function DecodeWorkspace() {
   useUpgradeReturn(() => {
     setJustUpgraded(true)
     setStatus('idle')
-    fetchUsage()
+    pollUsageAfterUpgrade()
   })
 
   async function startCheckout(plan = 'pro') {
@@ -361,7 +397,7 @@ export default function DecodeWorkspace() {
       const data = await res.json()
 
       if (res.status === 402 && data.error === 'limit_reached') {
-        setUsage({ plan: 'free', used: data.used, limit: data.limit })
+        setUsage({ plan: data.plan || 'free', used: data.used, limit: data.limit })
         setStatus('limit_reached')
         return
       }
@@ -619,7 +655,9 @@ const s = {
   },
   tierGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    // auto-fit keeps three columns on desktop but stacks the cards on narrow
+    // screens -- inline styles can't use media queries, this can.
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
     gap: 16,
     alignItems: 'center',
     maxWidth: 760,

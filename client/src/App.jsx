@@ -23,6 +23,10 @@ function HeaderPlanStatus() {
       } catch { /* non-critical */ }
     }
     fetchUsage()
+    // Re-fetch when the workspace confirms a plan change (post-checkout poll),
+    // so the badge flips from the usage counter to Pro/Business without a reload.
+    window.addEventListener('verdict:usage-refresh', fetchUsage)
+    return () => window.removeEventListener('verdict:usage-refresh', fetchUsage)
   }, [getToken])
 
   async function handleUpgrade() {

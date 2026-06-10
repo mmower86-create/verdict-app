@@ -6,6 +6,7 @@ const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const Stripe = require('stripe');
 const { clerkMiddleware, requireAuth, getAuth } = require('@clerk/express');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const supabase = require('./db');
 
 const app = express();
@@ -88,6 +89,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
       if (error) console.error('Webhook plan-switch failed:', error.message);
       else console.log(`Switched ${stripeCustomerId} to ${plan} (price ${priceId})`);
+    } else if (status === 'unpaid') {
+      // Dunning exhausted -- every retry on their card failed. Drop access now
+      // instead of waiting for Stripe to (maybe) cancel the subscription.
+      // 'past_due' is intentionally NOT handled: retries are still running.
+      const { error } = await supabase
+        .from('users')
+        .update({ plan: 'free' })
+        .eq('stripe_customer_id', stripeCustomerId);
+
+      if (error) console.error('Webhook unpaid-downgrade failed:', error.message);
+      else console.log(`Downgraded ${stripeCustomerId} to free (subscription unpaid)`);
     }
   }
 
@@ -111,6 +123,18 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
 app.use(express.json({ limit: '1mb' }));
 app.use(clerkMiddleware());
+
+// Per-user rate limit on decode. The monthly cap is count-then-insert, so a
+// burst of concurrent requests could all pass the check before any insert
+// lands -- this bounds how many Anthropic calls that race can cost.
+const decodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getAuth(req)?.userId ?? ipKeyGenerator(req.ip),
+  message: { error: 'Too many requests at once. Give it a minute and try again.' },
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -206,6 +230,21 @@ app.post('/api/checkout', requireAuth(), async (req, res) => {
   try {
     const user = await getOrCreateUser(userId);
 
+    // Already-subscribed users must go through the billing portal. Creating a
+    // second Checkout subscription for an existing subscriber double-charges
+    // them (Stripe Checkout does not dedupe subscriptions per customer) -- the
+    // portal swaps the price on the existing subscription with proration.
+    if (user.plan === 'pro' || user.plan === 'business') {
+      if (!user.stripe_customer_id) {
+        return res.status(409).json({ error: 'Your plan is already active.' });
+      }
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: user.stripe_customer_id,
+        return_url: CLIENT_URL,
+      });
+      return res.json({ url: portal.url });
+    }
+
     // Which tier is being purchased. Defaults to 'pro' for backward compatibility
     // with the existing single-button checkout.
     const requestedPlan = req.body?.plan === 'business' ? 'business' : 'pro';
@@ -285,7 +324,7 @@ app.post('/api/portal', requireAuth(), async (req, res) => {
 });
 
 // Decode -- Clerk session required, free-tier gate enforced server-side
-app.post('/api/decode', requireAuth(), async (req, res) => {
+app.post('/api/decode', requireAuth(), decodeLimiter, async (req, res) => {
   const { userId } = getAuth(req);
   const { docType, text } = req.body;
 
@@ -312,7 +351,9 @@ app.post('/api/decode', requireAuth(), async (req, res) => {
     // Per-plan monthly cap. limit === null means uncapped (owner/comp accounts).
     const limit = limitForUser(user);
     if (limit !== null && used >= limit) {
-      return res.status(402).json({ error: 'limit_reached', used, limit });
+      // plan is included so the client can show the right wall (a Pro user at
+      // 15/15 is not on the "free" plan and must not be sold a second sub).
+      return res.status(402).json({ error: 'limit_reached', used, limit, plan: user.plan });
     }
 
     // Make sure they actually pasted the supported document type. Runs before the
@@ -325,18 +366,31 @@ app.post('/api/decode', requireAuth(), async (req, res) => {
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: text }],
     });
 
-    const result = message.content[0].text;
+    if (message.stop_reason === 'max_tokens') {
+      // Verdict was cut off mid-sentence. Still delivered, but flag it so a
+      // pattern of truncations shows up in the logs.
+      console.error(`Decode truncated at max_tokens for ${userId} (input ${text.length} chars)`);
+    }
 
-    await supabase.from('decodes').insert({
+    const textBlock = message.content.find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Model response contained no text block');
+    const result = textBlock.text;
+
+    const { error: insertError } = await supabase.from('decodes').insert({
       clerk_user_id: userId,
       doc_type: docType,
       result_text: result,
     });
+    if (insertError) {
+      // Result is already in hand, so deliver it -- but this decode is now
+      // uncounted and missing from history, which needs investigating.
+      console.error(`Decode insert failed for ${userId} (delivered but unrecorded):`, insertError.message);
+    }
 
     res.json({ result });
   } catch (err) {

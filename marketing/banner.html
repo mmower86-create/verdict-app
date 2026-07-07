@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Geist+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1500px; height: 500px; overflow: hidden; }
+  .banner {
+    width: 1500px;
+    height: 500px;
+    background: #F7F5F0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    font-family: 'Fraunces', serif;
+    overflow: hidden;
+  }
+  /* subtle paper texture lines, like the landing page */
+  .banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(0deg, rgba(26,26,26,0.025) 0 1px, transparent 1px 64px);
+    pointer-events: none;
+  }
+  /* the big red bar accent on the right edge */
+  .accent-bar {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 14px;
+    background: #B91C1C;
+  }
+  .content {
+    margin-left: 380px;   /* clear the bottom-left profile-pic safe zone */
+    padding-right: 90px;
+    max-width: 1040px;
+  }
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: #B91C1C;
+    font-weight: 500;
+    margin-bottom: 22px;
+  }
+  .headline {
+    font-size: 76px;
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    color: #1A1A1A;
+  }
+  .headline .em { font-style: italic; color: #B91C1C; }
+  .sub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 21px;
+    letter-spacing: 0.02em;
+    color: #6B6459;
+    margin-top: 26px;
+    font-weight: 400;
+  }
+  .dot { color: #B91C1C; }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="accent-bar"></div>
+    <div class="content">
+      <div class="eyebrow">Read it before you sign</div>
+      <div class="headline">Stop signing what<br>you haven't <span class="em">read</span>.</div>
+      <div class="sub">AI that reads your lease &amp; flags what could cost you<span class="dot"> · </span>getverdict.net</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,59 +1,85 @@
-# Verdict — Traffic Strategy (the actual goal: people on getverdict.net)
+# Verdict — Traffic Strategy (source of truth)
+Updated 2026-07-25. Budget: $0 (paid ads on hold). Goal: clients by EOY.
 
-## The honest baseline (from Plausible, ~28 days)
-- 23 unique visitors, ~10 min avg visit, 3 pages/visit.
-- TRANSLATION: when people land, they're genuinely interested. The product/page
-  is NOT the problem. The ONLY problem is traffic volume.
-- So every move below is judged by ONE question: does it put more of the right
-  people on the site?
+## ⚠️ CURRENT BLOCKER: the app is offline
+- getverdict.net (Netlify landing): LIVE
+- app.getverdict.net + Railway API: **404, "Application not found"**
+- Cause: Railway trial credit ran out (~$5 left as of Jun 11), services removed.
+- Plausible also dead (trial expired ~Jul 5). No analytics since.
+- FIX IS FREE, NOT A CARD. See Phase 0. Nothing else matters until this is done.
 
-## The leverage ranking (highest traffic-per-effort first)
-1. **Reddit value posts** — r/renters, r/legaladvice, r/personalfinance,
-   r/firsttimehomebuyer. One good post can hit thousands of views. Renters there
-   are ACTIVELY asking "is this legal?" Highest intent + highest volume. FREE.
-2. **SEO / search** — people Googling "can my landlord enter without notice"
-   are higher-intent than any social scroller. Slow but compounds forever.
-3. **One strong X post/thread per day** — designed to be shared, not 5 tiny replies.
-4. **X replies** — lowest leverage. Keep it light (brand presence), don't pour
-   hours in. It's a slow-burn, not a traffic engine.
+## The honest baseline
+When people landed, they stayed ~10 min and read 3 pages. The page converts.
+Traffic volume was the problem, and now the app being down is a bigger one.
 
-## THE NEW WEEKLY AGENDA (replaces the old "15 min of X replies" grind)
+## The strategic point nobody named until now
+A renter needs a lease review ONCE a year. Asking them to start a $39/mo
+subscription for that is a brutal ask and explains near-zero conversion better
+than traffic does. A one-time price is the single highest-leverage change
+available, and it costs nothing to build.
 
-### Daily (~15-20 min total)
-- [ ] **1 X post** (from drafts) — keeps the account alive. Skip the reply grind
-      or do just 1-2. Replies are no longer the main thing.
-- [ ] **Check Plausible** for 30 sec — did anything spike? What drove it? Follow
-      the data, not the routine.
+## Economics of paid (why it's on hold, and why that's fine)
+At $19-29 one-time, Meta CPC ~$0.50-1.50 means $200 buys 150-400 visitors. Even
+2% conversion is 3-8 sales, roughly break-even. Paid ads are worth running for
+INFORMATION later, never as the scaling channel. Not a loss to defer them.
 
-### 2-3x per week (the real traffic work)
-- [ ] **1 Reddit value post or top-tier comment.** This is now the main event.
-      Value-first, NO link, mention Verdict only if natural/asked. (Drafts: ask
-      Claude "write me a Reddit post about X".)
-- [ ] Engage on Reddit like a human first — comment helpfully on a few threads
-      so the account isn't brand-new when you post. Reddit punishes drive-by promo.
+═══════════════════════════════════════════════════════════
+## PHASE 0 — this week: back online, $0
+═══════════════════════════════════════════════════════════
+1. **Frontend -> Netlify** (already paying for Personal, so free). Static Vite
+   build, netlify.toml already in repo. Point app.getverdict.net at it.
+2. **Backend -> Render free tier.** Express server, needs env vars re-entered.
+   Tradeoff: free tier sleeps after 15 min idle, first request waits 30-60s.
+   Invisible at current traffic.
+3. **Analytics -> Cloudflare Web Analytics** (free, no trial to expire).
+   Replaces dead Plausible. Restores the one metric.
+4. **Add one-time pricing** (~$19-29 per lease review) alongside subscriptions.
+   New Stripe price + one-time checkout path + third pricing card.
 
-### Weekly
-- [ ] **1 SEO-style blog post** on getverdict.net (or a thread that doubles as one):
-      "Can my landlord enter without notice?", "What an early-termination fee
-      really costs", etc. Targets what renters actually Google. Compounds.
-- [ ] Review the week in Plausible. What channel actually drove visits? Double
-      down on that, drop what did nothing.
+═══════════════════════════════════════════════════════════
+## PHASE 1 — August: lease season, free channels
+═══════════════════════════════════════════════════════════
+August is the highest concentration of lease signings all year; window closes
+mid-September. Use it or lose it for another year.
+- **University off-campus housing Facebook groups.** Peak season, exact buyer,
+  free, concentrated. Value-first, no link drops. See facebook-groups.md.
+- **Reddit: comment-only.** Account is still karma-filtered (posts auto-removed).
+  Spend August earning posting rights with genuine no-link comments.
+- **X: 1-2 posts/week**, not daily. Keeps the account from looking dead. It is
+  brand presence, not a traffic engine. Do not give it hours.
 
-## What to STOP doing
-- ❌ Hours of X replies expecting traffic. It's brand presence, not a firehose.
-- ❌ Treating "did my 15 min of X" as the goal. The goal is VISITORS, measured
-   in Plausible. If a tactic isn't moving that number, change tactics.
+═══════════════════════════════════════════════════════════
+## PHASE 2 — Sept/Oct: SEO + B2B outreach (both free)
+═══════════════════════════════════════════════════════════
+- **SEO, 1 article/week.** Five months is exactly the SEO payoff window and it
+  lines up with the Dec-Jan money wall. Target what renters actually Google:
+  "can my landlord enter without notice", "how long to return security deposit",
+  "is my non-compete enforceable", "what is a reasonable late fee".
+- **B2B outreach, 10 emails/week.** This is where "clients" actually comes from.
+  Targets with RECURRING lease-review need:
+  - Relocation management companies (corporate relo, real budgets)
+  - Rental agents / small brokerages (differentiator for their renters)
+  - University off-campus housing offices (advise thousands of students)
+  - Employee-benefit platforms (Verdict as a perk)
+  Ten a week for eight weeks is 80 shots. You need two or three yeses.
 
-## Reddit ground rules (read before posting, or you'll get banned)
-- Give real value. NO link in the post body for r/renters etc.
-- Comment helpfully on 3-5 threads BEFORE you post anything of your own.
-- Mention Verdict at most once, softly, and only if it genuinely fits ("I built
-  a little tool that does this" in a comment, not the post title).
-- Read each subreddit's rules — some ban self-promo entirely. r/legaladvice is
-  strict; r/renters is more forgiving; r/SideProject and r/InternetIsBeautiful
-  ALLOW "I made this" posts (good for a launch-style share).
+═══════════════════════════════════════════════════════════
+## PHASE 3 — Nov/Dec: close and concentrate
+═══════════════════════════════════════════════════════════
+Sept articles start ranking. Work the outreach pipeline. Pour everything into
+whichever of SEO or outreach showed a pulse. Do not split effort in December.
 
-## The reframe
-You spent weeks building something good. The data proves people like it when they
-see it. Your job now is ONE thing: get more of the right eyeballs on the door.
-Reddit + search >> grinding X replies. Measure everything in Plausible.
+## What to STOP
+- The daily X post + Reddit karma grind as a primary activity. Two weeks of it
+  produced ~6 visitors. Batched, not life-eating.
+- Treating "did my 15 minutes" as the goal. The goal is visitors and replies.
+
+## The one metric
+Unique visitors (Cloudflare Web Analytics once restored), then replies to B2B
+outreach. Not X impressions.
+
+## Honest expectation
+At $0 with wholesaling correctly taking priority, December's realistic outcome is
+a few B2B conversations and SEO starting to rank. Not a windfall. It compounds
+into next year. Failure mode to avoid: Verdict marketing feeling productive
+enough to justify not making wholesaling calls.

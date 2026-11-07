@@ -20,14 +20,9 @@ const promptFiles = {
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Monthly decode caps per plan. An account with users.unlimited = true (owner/
-// comp only -- NOT a sellable tier) bypasses the cap entirely.
-const PLAN_LIMITS = { free: 3, pro: 15, business: 100 };
-const FREE_LIMIT = PLAN_LIMITS.free; // kept for any legacy references
-function limitForUser(user) {
-  if (user.unlimited) return null; // null = uncapped
-  return PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
-}
+// Plan caps and the month boundary live in ./limits so they can be unit tested
+// without a database or env vars. See server/audit/manifest.js invariants C1-C6.
+const { limitForUser, startOfMonthUTC } = require('./limits');
 
 // Minimum characters before we even attempt analysis. Anything shorter is
 // obviously not a document -- rejected for free, no API call, no decode counted.
@@ -137,11 +132,6 @@ const decodeLimiter = rateLimit({
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function startOfMonthUTC() {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-}
 
 async function getOrCreateUser(clerkUserId) {
   const { data, error } = await supabase

@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "medchron-review",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8731",
+        "--directory",
+        "/Users/matthewmower/medchron/sample_case"
+      ],
+      "port": 8731
+    },
+    {
+      "name": "medchron-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8732",
+        "--directory",
+        "/Users/matthewmower/medchron/site"
+      ],
+      "port": 8732
+    },
+    {
+      "name": "coach-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8733",
+        "--directory",
+        "/Users/matthewmower/coach-site"
+      ],
+      "port": 8733
+    }
+  ]
+}

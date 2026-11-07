@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node --watch index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test test/*.test.js",
+    "audit": "node --test test/*.test.js && node audit/run.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
